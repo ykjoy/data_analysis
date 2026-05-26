@@ -17,6 +17,7 @@ plotly>=5.18.0
 # 머신러닝 — 분류·회귀 ①, ②
 scikit-learn>=1.3.0
 xgboost>=2.0.0            # Gradient Boosting (RF 보다 정확도 ↑)
+statsmodels>=0.14.0       # Linear Regression β·p-value 통계 분석 ★추가
 
 # 시계열 — 실습 ③
 prophet>=1.1.5
