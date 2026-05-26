@@ -318,7 +318,8 @@ elif menu == "① 분류 · 불량분석":
 
         st.success("🎉 완료!")
         st.markdown("### 4️⃣ 모델 비교")
-        cmp = pd.DataFrame(results).T.applymap(lambda x: f"{x*100:.1f}%")
+        #cmp = pd.DataFrame(results).T.applymap(lambda x: f"{x*100:.1f}%")
+        cmp = pd.DataFrame(results).T.map(lambda x: f"{x*100:.1f}")
         st.dataframe(cmp, use_container_width=True)
 
         st.markdown("### 5️⃣ Feature Importance")
