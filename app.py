@@ -170,33 +170,6 @@ if menu == "🏠 홈":
         st.markdown("#### ③ Hugging Face")
         st.write("텍스트 감성 분석 · 이미지 분류")
 
-    st.markdown("---")
-    st.markdown("### 📥 이 앱 소스코드 다운로드")
-    st.caption("현재 실행 중인 app.py 파일을 그대로 받을 수 있습니다.")
-
-    try:
-        # 실행 파일 자기 자신을 읽어서 다운로드 제공
-        with open(__file__, "r", encoding="utf-8") as f:
-            code_text = f.read()
-        c1, c2 = st.columns(2)
-        with c1:
-            st.download_button(
-                "📄 app.py 다운로드",
-                data=code_text,
-                file_name="app.py",
-                mime="text/x-python",
-            )
-        with c2:
-            st.download_button(
-                "📝 app.txt 다운로드 (텍스트)",
-                data=code_text,
-                file_name="app.txt",
-                mime="text/plain",
-            )
-    except Exception as e:
-        st.warning(f"소스 파일 자동 로드 실패: {e}")
-        st.caption("이 경우 직접 파일을 텍스트 에디터로 열어 저장하세요.")
-
 
 # ============================================================================
 # ① 분류 · 불량분석
