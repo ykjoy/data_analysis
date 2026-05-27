@@ -39,30 +39,6 @@ plt.rcParams["axes.unicode_minus"] = False
 def setup_korean_font():
     plt.rcParams["axes.unicode_minus"] = False
  
-# ============================================================================
-# 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
-# ============================================================================
-"""
-KOR_FONT = None
-def setup_korean_font():
-    #한글 폰트 자동 탐지. 한 번 찾으면 캐시.
-    global KOR_FONT
-    if KOR_FONT is None:
-        import matplotlib.font_manager as fm
-        candidates = ["Malgun Gothic", "AppleGothic", "NanumGothic",
-                      "Noto Sans CJK KR", "DejaVu Sans"]
-        available = {f.name for f in fm.fontManager.ttflist}
-        for c in candidates:
-            if c in available:
-                KOR_FONT = c
-                break
-        if KOR_FONT is None:
-            KOR_FONT = "DejaVu Sans"
-    plt.rcParams["font.family"] = KOR_FONT
-    plt.rcParams["axes.unicode_minus"] = False
-
-setup_korean_font()
-"""
 
 # ============================================================================
 # 페이지 설정
