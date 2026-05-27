@@ -4,6 +4,8 @@
 #
 # 구성: ① 분류 · ② 시계열 · ③ Hugging Face
 
+koreanize-matplotlib>=0.1.1
+
 # 핵심 — Streamlit UI
 streamlit>=1.30.0
 
