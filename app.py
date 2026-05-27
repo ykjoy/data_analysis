@@ -26,6 +26,19 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+import platform
+
+# 운영체제에 맞는 한글 폰트 설정
+if platform.system() == 'Windows':
+    plt.rc('font', family='Malgun Gothic')
+elif platform.system() == 'Darwin': # Mac
+    plt.rc('font', family='AppleGothic')
+else: # Linux
+    plt.rc('font', family='NanumGothic')
+
+# 마이너스 기호 깨짐 방지
+plt.rcParams['axes.unicode_minus'] = False
+
 # ============================================================================
 # 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
 # ============================================================================
