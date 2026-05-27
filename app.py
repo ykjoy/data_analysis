@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
- 제조 데이터 분석 실습 앱  (Teaching Edition) — v3
+ 제조 데이터 분석 실습 앱  (Teaching Edition) — Lite
 ================================================================================
-변경 이력 (v3)
-  • ⑤ 피처 엔지니어링 탭 신규 추가
-      - 날짜 분해 / 계절 / 주기성(sin·cos) / 키워드 분류 / Lag / 이동평균
-      - 단위 보정(특정일 이후 ×N) / 원-핫 인코딩
-      - 처리 결과 CSV 화면에서 직접 다운로드
-  • 홈 화면에 "이 앱 소스코드 다운로드" 버튼 추가 (.py / .txt 둘 다)
-v2 → v3 외에는 분류·회귀·시계열·HF 메뉴 동일
+구성 메뉴
+  ① 분류 · 불량분석       — Random Forest / XGBoost / MLP 비교
+  ② 시계열 · 수요예측     — Prophet / LSTM
+  ③ Hugging Face 데모     — 텍스트 감성 분석 / 이미지 분류
+
+홈 화면에서 현재 실행 중인 app.py 소스 코드를 다운로드 받을 수 있습니다.
 ================================================================================
 """
 
@@ -140,10 +139,8 @@ menu = st.sidebar.radio(
     [
         "🏠 홈",
         "① 분류 · 불량분석",
-        "② 회귀 · 수치예측",
-        "③ 시계열 · 수요예측",
-        "④ Hugging Face 데모",
-        "⑤ 피처 엔지니어링",
+        "② 시계열 · 수요예측",
+        "③ Hugging Face 데모",
     ],
 )
 st.sidebar.markdown("---")
@@ -157,7 +154,7 @@ if menu == "🏠 홈":
     st.markdown("""
     <div class="main-header">
         <h1>제조 현장을 위한 데이터 분석 입문</h1>
-        <p>Classification · Regression · Time Series · Hugging Face · Feature Engineering</p>
+        <p>Classification · Time Series · Hugging Face</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -167,15 +164,11 @@ if menu == "🏠 홈":
     with col1:
         st.markdown("#### ① 분류 · 불량분석")
         st.write("Random Forest / XGBoost / MLP 동시 비교")
-        st.markdown("#### ② 회귀 · 수치예측")
-        st.write("Linear (Beta·p-value 통계표) · Ridge · XGBoost")
-        st.markdown("#### ③ 시계열 · 수요예측")
+        st.markdown("#### ② 시계열 · 수요예측")
         st.write("Prophet · LSTM")
     with col2:
-        st.markdown("#### ④ Hugging Face")
+        st.markdown("#### ③ Hugging Face")
         st.write("텍스트 감성 분석 · 이미지 분류")
-        st.markdown("#### ⑤ 피처 엔지니어링 ✨ NEW")
-        st.write("CSV 업로드 → 컬럼 추가 → 새 CSV 다운로드")
 
     st.markdown("---")
     st.markdown("### 📥 이 앱 소스코드 다운로드")
@@ -352,160 +345,11 @@ elif menu == "① 분류 · 불량분석":
 
 
 # ============================================================================
-# ② 회귀 · 수치예측
+# ② 시계열 · 수요예측
 # ============================================================================
-elif menu == "② 회귀 · 수치예측":
+elif menu == "② 시계열 · 수요예측":
     st.markdown("""
-    <div class="main-header"><h1>② 회귀 · 수치예측</h1>
-    <p>Linear (Beta · p-value) · Ridge · XGBoost</p></div>
-    """, unsafe_allow_html=True)
-
-    upload = st.file_uploader("회귀용 CSV", type=["csv"], key="reg_up")
-    if upload is None:
-        require_upload("⬆️ CSV 를 업로드하세요.")
-
-    df = smart_read_csv(upload)
-    st.success(f"✅ {df.shape[0]:,}행 × {df.shape[1]:,}컬럼")
-    with st.expander("📋 미리보기"):
-        st.dataframe(df.head(10), use_container_width=True)
-
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if not numeric_cols:
-        st.error("수치형 컬럼이 없습니다."); st.stop()
-
-    target_col = st.selectbox("예측할 숫자 컬럼", numeric_cols,
-                              index=len(numeric_cols)-1)
-
-    selected = feature_selector_ui(df, target_col, "reg")
-    if not selected:
-        st.error("피처를 1개 이상 선택하세요."); st.stop()
-
-    ca, cb, cc = st.columns(3)
-    with ca: use_lin = st.checkbox("📐 Linear (통계표)", True)
-    with cb: use_rd  = st.checkbox("🛡️ Ridge", True)
-    with cc: use_xr  = st.checkbox("⚡ XGBoost", True)
-
-    if st.button("🚀 학습 시작", type="primary"):
-        if not (use_lin or use_rd or use_xr):
-            st.error("모델 선택 필요"); st.stop()
-
-        with st.spinner("학습 중..."):
-            from sklearn.model_selection import train_test_split
-            from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-            y_raw = pd.to_numeric(df[target_col], errors="coerce")
-            X_raw = df[selected]
-            X, _ = clean_numeric_X(X_raw)
-            if X.shape[1] == 0:
-                st.error(
-                    "⚠️ **수치형 피처가 0개입니다.**\n\n"
-                    "선택된 피처가 모두 문자형이거나 분산 0입니다.\n"
-                    "→ **⑤ 피처 엔지니어링** 메뉴에서 컬럼을 먼저 만들어 보세요."
-                ); st.stop()
-            m = ~y_raw.isna() & np.isfinite(y_raw)
-            X = X.loc[m].reset_index(drop=True)
-            y = y_raw.loc[m].values.astype(float)
-            if len(y) < 10:
-                st.error("유효 행 부족"); st.stop()
-
-            X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
-
-            results, preds, models = {}, {}, {}
-            ols_table, ols_summary = None, None
-
-            if use_lin:
-                try:
-                    import statsmodels.api as sm
-                    X_tr_sm = sm.add_constant(X_tr, has_constant="add")
-                    X_te_sm = sm.add_constant(X_te, has_constant="add")
-                    X_te_sm = X_te_sm.reindex(columns=X_tr_sm.columns, fill_value=0)
-                    ols = sm.OLS(y_tr, X_tr_sm).fit()
-                    p = ols.predict(X_te_sm)
-                    models["Linear"] = ols; preds["Linear"] = p
-                    results["Linear"] = (mean_absolute_error(y_te,p),
-                                         np.sqrt(mean_squared_error(y_te,p)),
-                                         r2_score(y_te,p))
-                    tdf = pd.DataFrame({"변수": ols.params.index,
-                                        "Beta": ols.params.values,
-                                        "Std Err": ols.bse.values,
-                                        "t": ols.tvalues.values,
-                                        "p-value": ols.pvalues.values})
-                    def sig(p):
-                        if pd.isna(p): return ""
-                        if p < 0.001: return "★★★"
-                        if p < 0.01:  return "★★"
-                        if p < 0.05:  return "★"
-                        if p < 0.10:  return "."
-                        return ""
-                    tdf["유의성"] = tdf["p-value"].apply(sig)
-                    ols_table = tdf
-                    ols_summary = {"R²": ols.rsquared, "Adj.R²": ols.rsquared_adj,
-                                   "F p": ols.f_pvalue, "N": int(ols.nobs)}
-                except ImportError:
-                    st.error("pip install statsmodels"); use_lin = False
-
-            if use_rd:
-                from sklearn.linear_model import Ridge
-                r = Ridge(alpha=1.0); r.fit(X_tr, y_tr); p = r.predict(X_te)
-                models["Ridge"] = r; preds["Ridge"] = p
-                results["Ridge"] = (mean_absolute_error(y_te,p),
-                                    np.sqrt(mean_squared_error(y_te,p)),
-                                    r2_score(y_te,p))
-            if use_xr:
-                try:
-                    from xgboost import XGBRegressor
-                    xr = XGBRegressor(n_estimators=200, learning_rate=0.1, max_depth=6,
-                                      random_state=42, n_jobs=-1)
-                    xr.fit(X_tr, y_tr); p = xr.predict(X_te)
-                    models["XGBoost"] = xr; preds["XGBoost"] = p
-                    results["XGBoost"] = (mean_absolute_error(y_te,p),
-                                          np.sqrt(mean_squared_error(y_te,p)),
-                                          r2_score(y_te,p))
-                except ImportError:
-                    st.warning("xgboost 미설치")
-
-        st.success("🎉 완료!")
-        st.markdown("### 모델 비교")
-        rows = [{"모델": k, "MAE": f"{v[0]:.3f}", "RMSE": f"{v[1]:.3f}", "R²": f"{v[2]:.3f}"}
-                for k, v in results.items()]
-        st.dataframe(pd.DataFrame(rows).set_index("모델"), use_container_width=True)
-
-        if ols_table is not None:
-            st.markdown("---")
-            st.markdown("### 📐 Linear Regression — Beta · p-value")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("R²",      f"{ols_summary['R²']:.4f}")
-            c2.metric("Adj. R²", f"{ols_summary['Adj.R²']:.4f}")
-            c3.metric("F p",     f"{ols_summary['F p']:.2e}" if not pd.isna(ols_summary['F p']) else "N/A")
-            c4.metric("N",       f"{ols_summary['N']:,}")
-            disp = ols_table.copy()
-            disp["Beta"]    = disp["Beta"].apply(lambda v: f"{v:,.4f}")
-            disp["Std Err"] = disp["Std Err"].apply(lambda v: f"{v:,.4f}")
-            disp["t"]       = disp["t"].apply(lambda v: f"{v:,.3f}")
-            disp["p-value"] = disp["p-value"].apply(lambda v: f"{v:.4f}" if v>=1e-4 else f"{v:.2e}")
-            st.dataframe(disp, use_container_width=True, hide_index=True)
-            st.caption("★ p<0.05, ★★ p<0.01, ★★★ p<0.001 — 유의한 변수일수록 별이 많습니다.")
-
-        non_lin = {k: v for k, v in preds.items() if k != "Linear"}
-        if non_lin:
-            st.markdown("### 예측 vs 실제 (Ridge / XGBoost)")
-            cols = st.columns(len(non_lin))
-            for i, (k, p) in enumerate(non_lin.items()):
-                fig, ax = plt.subplots(figsize=(5,4))
-                ax.scatter(y_te, p, alpha=0.5, color="#1E3A5F", s=15)
-                lims = [min(y_te.min(), p.min()), max(y_te.max(), p.max())]
-                ax.plot(lims, lims, "--", color="#F47C3C")
-                ax.set_xlabel("실제"); ax.set_ylabel("예측")
-                ax.set_title(f"{k} (R²={results[k][2]:.3f})")
-                fig.tight_layout(); cols[i].pyplot(fig)
-
-
-# ============================================================================
-# ③ 시계열 · 수요예측
-# ============================================================================
-elif menu == "③ 시계열 · 수요예측":
-    st.markdown("""
-    <div class="main-header"><h1>③ 시계열 · 수요예측</h1>
+    <div class="main-header"><h1>② 시계열 · 수요예측</h1>
     <p>Prophet · LSTM</p></div>
     """, unsafe_allow_html=True)
 
@@ -636,11 +480,11 @@ elif menu == "③ 시계열 · 수요예측":
 
 
 # ============================================================================
-# ④ Hugging Face
+# ③ Hugging Face
 # ============================================================================
-elif menu == "④ Hugging Face 데모":
+elif menu == "③ Hugging Face 데모":
     st.markdown("""
-    <div class="main-header"><h1>④ Hugging Face</h1>
+    <div class="main-header"><h1>③ Hugging Face</h1>
     <p>사전학습 모델 즉시 사용</p></div>
     """, unsafe_allow_html=True)
 
@@ -689,238 +533,3 @@ elif menu == "④ Hugging Face 데모":
                     except Exception as e:
                         st.error(f"실패: {e}")
 
-
-# ============================================================================
-# ⑤ 피처 엔지니어링 (NEW)
-# ============================================================================
-elif menu == "⑤ 피처 엔지니어링":
-    st.markdown("""
-    <div class="main-header"><h1>⑤ 피처 엔지니어링</h1>
-    <p>CSV 업로드 → 컬럼 추가 → 새 CSV 다운로드</p></div>
-    """, unsafe_allow_html=True)
-
-    st.write(
-        "회귀나 분류에 쓸 수 있는 **새로운 입력 변수(피처)** 를 화면에서 직접 만들어 봅니다. "
-        "예: 신재생에너지 발전량 데이터에서 *월·요일·계절·발전유형·지역·전일 발전량(lag)* 등을 추가."
-    )
-
-    upload = st.file_uploader("원본 CSV 업로드", type=["csv"], key="fe_up")
-    if upload is None:
-        require_upload("⬆️ 가공할 CSV 를 업로드하세요.")
-
-    df = smart_read_csv(upload)
-    st.success(f"✅ 원본: {df.shape[0]:,}행 × {df.shape[1]:,}컬럼")
-    with st.expander("📋 원본 미리보기"):
-        st.dataframe(df.head(10), use_container_width=True)
-
-    work = df.copy()
-    cols_all = work.columns.tolist()
-
-    # ─────────────────────────────────────────────────────────
-    # ① 단위 보정 (옵션)
-    # ─────────────────────────────────────────────────────────
-    st.markdown("### 1️⃣ 단위 보정 (선택)")
-    st.caption("예: 신재생 데이터처럼 특정 날짜 이후 값이 1000배로 갑자기 변했을 때 보정.")
-    use_unitfix = st.checkbox("단위 보정 사용", value=False, key="fe_unit")
-    if use_unitfix:
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            unit_date_col = st.selectbox("기준 날짜 컬럼", cols_all, key="fe_udcol")
-        with c2:
-            unit_target_col = st.selectbox("보정할 값 컬럼", cols_all, key="fe_utcol")
-        with c3:
-            unit_cutoff = st.text_input("기준일 (YYYY-MM-DD) 이후부터", "2025-01-01")
-        with c4:
-            unit_div = st.number_input("나눌 값", value=1000.0, step=100.0)
-        try:
-            tmp_dt = pd.to_datetime(work[unit_date_col], errors="coerce")
-            cutoff_ts = pd.Timestamp(unit_cutoff)
-            mask = tmp_dt >= cutoff_ts
-            n_aff = int(mask.sum())
-            st.info(f"📌 적용 대상: {n_aff:,}행")
-        except Exception as e:
-            st.warning(f"미리보기 실패: {e}")
-
-    # ─────────────────────────────────────────────────────────
-    # ② 날짜 컬럼 분해
-    # ─────────────────────────────────────────────────────────
-    st.markdown("### 2️⃣ 날짜 컬럼 분해")
-    use_date = st.checkbox("날짜 → year/month/day/weekday/quarter/계절/sin·cos 추가",
-                           value=True, key="fe_date")
-    date_col = None
-    if use_date:
-        date_col = st.selectbox("날짜 컬럼", cols_all, key="fe_datecol")
-
-    # ─────────────────────────────────────────────────────────
-    # ③ 카테고리 컬럼에서 키워드 추출
-    # ─────────────────────────────────────────────────────────
-    st.markdown("### 3️⃣ 텍스트 컬럼 → 키워드 분류")
-    st.caption("예: '보령 #3태양광' 에서 → 발전유형=태양광, 지역=보령")
-    use_kw = st.checkbox("키워드 분류 사용", value=False, key="fe_kw")
-    kw_settings = []
-    if use_kw:
-        kw_col = st.selectbox("분류할 텍스트 컬럼", cols_all, key="fe_kwcol")
-        st.markdown("**분류 규칙** (한 줄에 하나, `새컬럼명=키워드1,키워드2,...` 형식)")
-        default_rules = (
-            "발전유형=수상태양광,태양광,연료전지,풍력,소수력\n"
-            "지역=신보령,신서천,보령,서울,세종,인천,제주,서천,여수,괴산,태안,양양"
-        )
-        rules_text = st.text_area("규칙", value=default_rules, height=100, key="fe_rules")
-        # 파싱
-        for line in rules_text.strip().split("\n"):
-            if "=" not in line:
-                continue
-            new_col, kws = line.split("=", 1)
-            kw_list = [k.strip() for k in kws.split(",") if k.strip()]
-            kw_settings.append((new_col.strip(), kw_list))
-        if kw_settings:
-            st.caption("→ 생성될 컬럼: " + ", ".join([s[0] for s in kw_settings]))
-
-    # ─────────────────────────────────────────────────────────
-    # ④ Lag / 이동평균
-    # ─────────────────────────────────────────────────────────
-    st.markdown("### 4️⃣ Lag · 이동평균 (시계열 피처)")
-    use_lag = st.checkbox("lag_1 / lag_7 / ma_7 / ma_30 추가", value=False, key="fe_lag")
-    lag_target = None; lag_group = None; lag_datesort = None
-    if use_lag:
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            lag_target = st.selectbox("값 컬럼 (lag 대상)", cols_all, key="fe_lagt")
-        with c2:
-            grp_options = ["(그룹 없음)"] + cols_all
-            lag_group_sel = st.selectbox("그룹 컬럼 (예: 발전설비)", grp_options, key="fe_lagg")
-            lag_group = None if lag_group_sel == "(그룹 없음)" else lag_group_sel
-        with c3:
-            lag_datesort = st.selectbox("정렬용 날짜 컬럼", cols_all, key="fe_lagd")
-
-    # ─────────────────────────────────────────────────────────
-    # ⑤ 원-핫 인코딩
-    # ─────────────────────────────────────────────────────────
-    st.markdown("### 5️⃣ 원-핫 인코딩")
-    onehot_cols = st.multiselect(
-        "원-핫 변환할 카테고리 컬럼 (위에서 새로 만든 컬럼도 선택 가능)",
-        cols_all + [s[0] for s in kw_settings] + (["season"] if use_date else []),
-        default=[],
-        key="fe_oh"
-    )
-
-    st.markdown("---")
-    run = st.button("🛠️ 컬럼 추가 실행", type="primary")
-
-    if run:
-        with st.spinner("처리 중..."):
-            log = []
-
-            # ① 단위 보정
-            if use_unitfix:
-                try:
-                    tmp_dt = pd.to_datetime(work[unit_date_col], errors="coerce")
-                    mask = tmp_dt >= pd.Timestamp(unit_cutoff)
-                    work[unit_target_col] = pd.to_numeric(work[unit_target_col], errors="coerce")
-                    n_aff = int(mask.sum())
-                    work.loc[mask, unit_target_col] = work.loc[mask, unit_target_col] / unit_div
-                    log.append(f"✅ 단위 보정: {n_aff:,}행 ÷ {unit_div}")
-                except Exception as e:
-                    log.append(f"⚠️ 단위 보정 실패: {e}")
-
-            # ② 날짜 분해
-            if use_date and date_col:
-                try:
-                    dt = pd.to_datetime(work[date_col], errors="coerce")
-                    work["year"]       = dt.dt.year
-                    work["month"]      = dt.dt.month
-                    work["day"]        = dt.dt.day
-                    work["weekday"]    = dt.dt.weekday
-                    work["quarter"]    = dt.dt.quarter
-                    work["dayofyear"]  = dt.dt.dayofyear
-                    work["is_weekend"] = (dt.dt.weekday >= 5).astype(int)
-                    def _sn(m):
-                        if pd.isna(m): return None
-                        m = int(m)
-                        if m in [3,4,5]: return "봄"
-                        if m in [6,7,8]: return "여름"
-                        if m in [9,10,11]: return "가을"
-                        return "겨울"
-                    work["season"] = work["month"].apply(_sn)
-                    work["month_sin"]   = np.sin(2*np.pi*work["month"]/12)
-                    work["month_cos"]   = np.cos(2*np.pi*work["month"]/12)
-                    work["weekday_sin"] = np.sin(2*np.pi*work["weekday"]/7)
-                    work["weekday_cos"] = np.cos(2*np.pi*work["weekday"]/7)
-                    work["doy_sin"]     = np.sin(2*np.pi*work["dayofyear"]/365)
-                    work["doy_cos"]     = np.cos(2*np.pi*work["dayofyear"]/365)
-                    log.append(f"✅ 날짜 분해: '{date_col}' → 13개 컬럼 추가")
-                except Exception as e:
-                    log.append(f"⚠️ 날짜 분해 실패: {e}")
-
-            # ③ 키워드 분류
-            if use_kw and kw_settings:
-                for new_col, kws in kw_settings:
-                    def _match(s, keywords=kws):
-                        s = str(s)
-                        for k in keywords:
-                            if k in s:
-                                return k
-                        return "기타"
-                    work[new_col] = work[kw_col].apply(_match)
-                    log.append(f"✅ 키워드 분류: '{new_col}' (값: {work[new_col].nunique()}종)")
-
-            # ④ Lag
-            if use_lag and lag_target:
-                try:
-                    work[lag_target] = pd.to_numeric(work[lag_target], errors="coerce")
-                    sort_keys = [lag_group, lag_datesort] if lag_group else [lag_datesort]
-                    sort_keys = [c for c in sort_keys if c]
-                    if sort_keys:
-                        work = work.sort_values(sort_keys).reset_index(drop=True)
-                    if lag_group:
-                        g = work.groupby(lag_group, group_keys=False)[lag_target]
-                    else:
-                        g = work[lag_target]
-                    work["lag_1"] = g.shift(1)
-                    work["lag_7"] = g.shift(7)
-                    if lag_group:
-                        work["ma_7"]  = work.groupby(lag_group, group_keys=False)[lag_target]\
-                                            .apply(lambda s: s.shift(1).rolling(7,  min_periods=3).mean())
-                        work["ma_30"] = work.groupby(lag_group, group_keys=False)[lag_target]\
-                                            .apply(lambda s: s.shift(1).rolling(30, min_periods=7).mean())
-                    else:
-                        work["ma_7"]  = work[lag_target].shift(1).rolling(7,  min_periods=3).mean()
-                        work["ma_30"] = work[lag_target].shift(1).rolling(30, min_periods=7).mean()
-                    log.append(f"✅ Lag/MA: lag_1, lag_7, ma_7, ma_30")
-                except Exception as e:
-                    log.append(f"⚠️ Lag 실패: {e}")
-
-            # ⑤ 원-핫
-            if onehot_cols:
-                # 존재하지 않거나 이미 수치형인 컬럼 필터
-                valid = [c for c in onehot_cols if c in work.columns]
-                if valid:
-                    work = pd.get_dummies(work, columns=valid, dtype=int)
-                    log.append(f"✅ 원-핫 인코딩: {valid}")
-
-        st.success("🎉 처리 완료!")
-        for line in log:
-            st.write(line)
-
-        st.markdown(f"### 결과: **{work.shape[0]:,}행 × {work.shape[1]:,}컬럼**")
-        st.dataframe(work.head(20), use_container_width=True)
-
-        with st.expander("📋 추가된/변경된 컬럼 전체 목록"):
-            new_cols = [c for c in work.columns if c not in df.columns]
-            st.write(f"새로 생성: {len(new_cols)}개")
-            st.code(", ".join(new_cols) if new_cols else "(없음)")
-
-        # 다운로드 버튼
-        st.markdown("### 📥 새 CSV 다운로드")
-        csv_bytes = work.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        st.download_button(
-            label="💾 처리된 CSV 다운로드",
-            data=csv_bytes,
-            file_name="featured_data.csv",
-            mime="text/csv",
-            type="primary",
-        )
-        st.caption(
-            "✅ 이 CSV 를 **② 회귀** 또는 **① 분류** 메뉴에 다시 업로드하면 "
-            "추가된 피처(month, lag_1, 발전유형_태양광 등)를 그대로 사용할 수 있습니다."
-        )
