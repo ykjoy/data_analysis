@@ -45,7 +45,7 @@ def setup_korean_font():
 """
 KOR_FONT = None
 def setup_korean_font():
-    """한글 폰트 자동 탐지. 한 번 찾으면 캐시."""
+    #한글 폰트 자동 탐지. 한 번 찾으면 캐시.
     global KOR_FONT
     if KOR_FONT is None:
         import matplotlib.font_manager as fm
