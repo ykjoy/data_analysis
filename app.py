@@ -26,45 +26,23 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-import platform
-from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 
-KOR_FONT = None
+# ============================================================================
+# 한글 폰트  — koreanize_matplotlib 패키지가 NanumGothic 을 자체 포함.
+#              import 한 줄로 matplotlib 폰트 등록 완료 (시스템 의존 X).
+# ============================================================================
+import koreanize_matplotlib  # noqa: F401  ← import 만으로 폰트 등록됨
+plt.rcParams["axes.unicode_minus"] = False
+
+# 차트 직전에 호출하던 setup_korean_font() 와 호환 (no-op).
+# 이 함수를 호출하는 코드들이 코드 곳곳에 있어서 함수 자체는 남겨둠.
 def setup_korean_font():
-    """OS별 한글 폰트 자동 설정 (Streamlit Cloud Linux 포함). 캐시 stale 문제 회피."""
-    global KOR_FONT
-    if KOR_FONT is None:
-        system = platform.system()
-        if system == "Windows":
-            KOR_FONT = "Malgun Gothic"
-        elif system == "Darwin":          # Mac
-            KOR_FONT = "AppleGothic"
-        else:                              # Linux (Streamlit Cloud)
-            # fonts-nanum apt 설치 후 폰트 파일 경로를 직접 fontManager 에 등록.
-            # family 이름만 지정하는 plt.rc('font', family='NanumGothic') 방식은
-            # matplotlib 폰트 캐시가 stale 이면 깨짐. 파일 경로 등록은 항상 작동.
-            candidates = [
-                "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-                "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
-                "/usr/share/fonts/nanum/NanumGothic.ttf",
-            ]
-            for p in candidates:
-                if Path(p).exists():
-                    fm.fontManager.addfont(p)
-                    KOR_FONT = fm.FontProperties(fname=p).get_name()
-                    break
-            if KOR_FONT is None:
-                KOR_FONT = "DejaVu Sans"   # 폴백
-    plt.rcParams["font.family"] = KOR_FONT
     plt.rcParams["axes.unicode_minus"] = False
-
-setup_korean_font()
-
+ 
 # ============================================================================
 # 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
 # ============================================================================
+"""
 KOR_FONT = None
 def setup_korean_font():
     """한글 폰트 자동 탐지. 한 번 찾으면 캐시."""
@@ -84,7 +62,7 @@ def setup_korean_font():
     plt.rcParams["axes.unicode_minus"] = False
 
 setup_korean_font()
-
+"""
 
 # ============================================================================
 # 페이지 설정
