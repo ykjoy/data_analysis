@@ -4,8 +4,6 @@
 #
 # 구성: ① 분류 · ② 시계열 · ③ Hugging Face
 
-platform
-
 # 핵심 — Streamlit UI
 streamlit>=1.30.0
 
