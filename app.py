@@ -27,17 +27,40 @@ import matplotlib.pyplot as plt
 
 
 import platform
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
-# 운영체제에 맞는 한글 폰트 설정
-if platform.system() == 'Windows':
-    plt.rc('font', family='Malgun Gothic')
-elif platform.system() == 'Darwin': # Mac
-    plt.rc('font', family='AppleGothic')
-else: # Linux
-    plt.rc('font', family='NanumGothic')
+KOR_FONT = None
+def setup_korean_font():
+    """OS별 한글 폰트 자동 설정 (Streamlit Cloud Linux 포함). 캐시 stale 문제 회피."""
+    global KOR_FONT
+    if KOR_FONT is None:
+        system = platform.system()
+        if system == "Windows":
+            KOR_FONT = "Malgun Gothic"
+        elif system == "Darwin":          # Mac
+            KOR_FONT = "AppleGothic"
+        else:                              # Linux (Streamlit Cloud)
+            # fonts-nanum apt 설치 후 폰트 파일 경로를 직접 fontManager 에 등록.
+            # family 이름만 지정하는 plt.rc('font', family='NanumGothic') 방식은
+            # matplotlib 폰트 캐시가 stale 이면 깨짐. 파일 경로 등록은 항상 작동.
+            candidates = [
+                "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+                "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+                "/usr/share/fonts/nanum/NanumGothic.ttf",
+            ]
+            for p in candidates:
+                if Path(p).exists():
+                    fm.fontManager.addfont(p)
+                    KOR_FONT = fm.FontProperties(fname=p).get_name()
+                    break
+            if KOR_FONT is None:
+                KOR_FONT = "DejaVu Sans"   # 폴백
+    plt.rcParams["font.family"] = KOR_FONT
+    plt.rcParams["axes.unicode_minus"] = False
 
-# 마이너스 기호 깨짐 방지
-plt.rcParams['axes.unicode_minus'] = False
+setup_korean_font()
 
 # ============================================================================
 # 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
