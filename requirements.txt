@@ -1,37 +1,31 @@
-# 제조 데이터 분석 실습 앱 (Lite) — 패키지 목록
+# 제조 데이터 분석 실습 앱 (Lite) — Streamlit Cloud 안정 버전
 # 설치: pip install -r requirements.txt
 # 실행: streamlit run app.py
-#
-# 구성: ① 분류 · ② 시계열 · ③ Hugging Face
 
-koreanize-matplotlib>=0.1.1
+# 핵심
+streamlit>=1.30.0,<2.0.0
 
-# 핵심 — Streamlit UI
-streamlit>=1.30.0
-
-# 데이터 처리
-pandas>=2.0.0
-numpy>=1.24.0
-openpyxl>=3.1.0           # .xlsx 파일 읽기
+# 데이터
+pandas>=2.0.0,<2.3.0
+numpy>=1.24.0,<2.0.0
+openpyxl>=3.1.0
 
 # 시각화
 matplotlib>=3.7.0
 plotly>=5.18.0
+koreanize-matplotlib>=0.1.1
 
-# 머신러닝 — ① 분류
-scikit-learn>=1.3.0
-xgboost>=2.0.0            # Gradient Boosting (RF 보다 정확도 ↑)
+# 머신러닝
+scikit-learn>=1.3.0,<1.6.0
+xgboost>=2.0.0,<2.2.0
+imbalanced-learn>=0.11.0    # SMOTE · RandomUnderSampler (분류 불균형 처리)
 
-# 시계열 — ② 수요예측
-prophet>=1.1.5
-# (cmdstanpy 자동 설치)
+# 시계열
+prophet==1.1.5
 
-# 딥러닝 — LSTM 및 Hugging Face 모델용 (CPU 권장)
-torch>=2.0.0
+# 딥러닝 (CPU)
+torch>=2.0.0,<2.4.0
 
-# 사전학습 모델 — ③ Hugging Face
-transformers>=4.36.0
-Pillow>=10.0.0            # 이미지 처리
-
-# 객체 탐지 (YOLO) — 슬라이드 데모 코드용 (선택)
-ultralytics>=8.0.0
+# 사전학습 모델
+transformers>=4.36.0,<4.45.0
+Pillow>=10.0.0

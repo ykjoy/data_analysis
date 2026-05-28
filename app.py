@@ -26,19 +26,29 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-
 # ============================================================================
-# 한글 폰트  — koreanize_matplotlib 패키지가 NanumGothic 을 자체 포함.
-#              import 한 줄로 matplotlib 폰트 등록 완료 (시스템 의존 X).
+# 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
 # ============================================================================
-import koreanize_matplotlib  # noqa: F401  ← import 만으로 폰트 등록됨
-plt.rcParams["axes.unicode_minus"] = False
-
-# 차트 직전에 호출하던 setup_korean_font() 와 호환 (no-op).
-# 이 함수를 호출하는 코드들이 코드 곳곳에 있어서 함수 자체는 남겨둠.
+KOR_FONT = None
 def setup_korean_font():
+    """한글 폰트 자동 탐지. 한 번 찾으면 캐시."""
+    global KOR_FONT
+    if KOR_FONT is None:
+        import matplotlib.font_manager as fm
+        candidates = ["Malgun Gothic", "AppleGothic", "NanumGothic",
+                      "Noto Sans CJK KR", "DejaVu Sans"]
+        available = {f.name for f in fm.fontManager.ttflist}
+        for c in candidates:
+            if c in available:
+                KOR_FONT = c
+                break
+        if KOR_FONT is None:
+            KOR_FONT = "DejaVu Sans"
+    plt.rcParams["font.family"] = KOR_FONT
     plt.rcParams["axes.unicode_minus"] = False
- 
+
+setup_korean_font()
+
 
 # ============================================================================
 # 페이지 설정
@@ -257,7 +267,8 @@ xgb.fit(X_tr, y_tr)
                 f"⚠️ **클래스 불균형 감지** — 소수 클래스 비율 {minority_ratio*100:.1f}%\n\n"
                 f"• 모델이 모두 다수 클래스로 찍어도 정확도가 {(1-minority_ratio)*100:.0f}% 가 나옵니다.\n"
                 f"• Accuracy 보다 **Recall · F1** 을 봐야 합니다.\n"
-                f"• 아래 ④ 에서 `class_weight=balanced` 자동 적용됩니다."
+                f"• 아래 **④ 불균형 처리** 섹션에서 리샘플링·임계값을 조정해 보세요. "
+                f"`class_weight=balanced` 만으로는 부족한 경우가 많습니다."
             )
 
     selected = feature_selector_ui(df, target_col, "cls")
@@ -291,7 +302,39 @@ xgb.fit(X_tr, y_tr)
                 help="F-test: 선형 관계. Mutual Info: 비선형 관계까지 탐지."
             )
 
-    st.markdown("### 4️⃣ 모델 선택")
+    # ── ★ 불균형 처리 (NEW) ──────────────────────────────────────
+    st.markdown("### 4️⃣ 불균형 처리 ⚖️")
+    st.caption(
+        "소수 클래스(불량) 비율이 10% 미만이면 `class_weight=balanced` 만으로는 부족합니다. "
+        "데이터 레벨에서 균형을 맞추거나 결정 임계값을 낮춰야 Recall 이 올라갑니다."
+    )
+    ib1, ib2 = st.columns([1, 1])
+    with ib1:
+        resample_method = st.radio(
+            "리샘플링 방법",
+            ["없음 (class_weight 만)", "SMOTE (소수 합성↑)", "Undersample (다수↓)"],
+            index=1,
+            help=(
+                "• 없음: 데이터 그대로. RF 는 class_weight=balanced, "
+                "XGB 는 scale_pos_weight 자동 적용.\n"
+                "• SMOTE: 소수 클래스 가까운 점 사이를 보간해서 합성 샘플 생성. "
+                "Precision 유지하며 Recall 개선.\n"
+                "• Undersample: 다수 클래스 무작위 축소. Recall 대폭 ↑ 하지만 "
+                "FP(잘못된 경보) 도 증가. 정보 손실 있음."
+            )
+        )
+    with ib2:
+        threshold = st.slider(
+            "결정 임계값 (소수 클래스로 판정할 확률 컷오프)",
+            0.10, 0.50, 0.50, 0.05,
+            help=(
+                "기본 0.50. 값을 낮추면 더 많은 케이스를 불량으로 분류 → "
+                "Recall ↑, Precision ↓. 제조 현장처럼 FN(놓친 불량) 비용이 큰 경우 "
+                "0.2~0.3 으로 낮추는 게 일반적."
+            )
+        )
+
+    st.markdown("### 5️⃣ 모델 선택")
     ca, cb, cc = st.columns(3)
     with ca: use_rf  = st.checkbox("🌳 Random Forest", True)
     with cb: use_xgb = st.checkbox("⚡ XGBoost", True)
@@ -337,6 +380,7 @@ xgb.fit(X_tr, y_tr)
                 )
 
             from sklearn.model_selection import train_test_split
+            from collections import Counter
             try:
                 X_tr, X_te, y_tr, y_te = train_test_split(
                     X, y, test_size=0.2, random_state=42, stratify=y)
@@ -345,12 +389,48 @@ xgb.fit(X_tr, y_tr)
                     X, y, test_size=0.2, random_state=42)
                 st.warning("stratify 생략됨.")
 
+            # ── ★ 리샘플링 적용 (NEW) ─────────────────────────────
+            # 주의: 리샘플링은 train set 에만 적용. test set 은 원본 그대로.
+            resample_applied = "없음"
+            if "SMOTE" in resample_method:
+                try:
+                    from imblearn.over_sampling import SMOTE
+                    n_min = min(Counter(y_tr).values())
+                    k_neighbors = max(1, min(5, n_min - 1))
+                    sm = SMOTE(random_state=42, k_neighbors=k_neighbors)
+                    X_tr_arr, y_tr = sm.fit_resample(X_tr, y_tr)
+                    X_tr = pd.DataFrame(X_tr_arr, columns=X_tr.columns) \
+                           if hasattr(X_tr, "columns") else X_tr_arr
+                    resample_applied = f"SMOTE (학습셋 → {dict(Counter(y_tr))})"
+                except ImportError:
+                    st.error("⚠️ imbalanced-learn 미설치. `pip install imbalanced-learn` 후 사용.")
+                    st.stop()
+            elif "Undersample" in resample_method:
+                try:
+                    from imblearn.under_sampling import RandomUnderSampler
+                    ru = RandomUnderSampler(random_state=42)
+                    X_tr_arr, y_tr = ru.fit_resample(X_tr, y_tr)
+                    X_tr = pd.DataFrame(X_tr_arr, columns=X_tr.columns) \
+                           if hasattr(X_tr, "columns") else X_tr_arr
+                    resample_applied = f"Undersample (학습셋 → {dict(Counter(y_tr))})"
+                except ImportError:
+                    st.error("⚠️ imbalanced-learn 미설치. `pip install imbalanced-learn` 후 사용.")
+                    st.stop()
+
             # 불균형 비율 계산 (XGBoost scale_pos_weight 용)
-            from collections import Counter
             counts = Counter(y_tr)
             n_majority = max(counts.values())
             n_minority = min(counts.values())
             spw = n_majority / max(n_minority, 1)
+
+            # ── ★ 리샘플링 적용 시에는 class_weight/scale_pos_weight 끔 ─────
+            # 둘 다 켜면 소수 클래스 가중치가 이중 적용되어 오히려 성능 저하.
+            already_balanced = "SMOTE" in resample_method or "Undersample" in resample_method
+
+            # 소수 클래스 인덱스 (이진분류일 때 임계값 적용 대상)
+            test_counts_for_minor = Counter(y_te) if len(y_te) else Counter(y_tr)
+            minor_class_idx = min(test_counts_for_minor, key=test_counts_for_minor.get) \
+                              if len(class_names) == 2 else None
 
             from sklearn.metrics import (accuracy_score, precision_score,
                                          recall_score, f1_score,
@@ -363,11 +443,23 @@ xgb.fit(X_tr, y_tr)
                         "Recall": recall_score(y_t, y_p, average=avg, zero_division=0),
                         "F1": f1_score(y_t, y_p, average=avg, zero_division=0)}
 
+            def apply_threshold(model, X_test):
+                """임계값 기반 예측. 이진분류 + threshold ≠ 0.5 일 때만 적용."""
+                if len(class_names) == 2 and abs(threshold - 0.5) > 1e-6 \
+                   and minor_class_idx is not None:
+                    proba = model.predict_proba(X_test)[:, minor_class_idx]
+                    pred = np.where(proba >= threshold, minor_class_idx,
+                                    1 - minor_class_idx)
+                    return pred
+                return model.predict(X_test)
+
             if use_rf:
                 from sklearn.ensemble import RandomForestClassifier
-                rf = RandomForestClassifier(n_estimators=n_est, random_state=42,
-                                            n_jobs=-1, class_weight="balanced")
-                rf.fit(X_tr, y_tr); p = rf.predict(X_te)
+                rf_kwargs = dict(n_estimators=n_est, random_state=42, n_jobs=-1)
+                if not already_balanced:
+                    rf_kwargs["class_weight"] = "balanced"
+                rf = RandomForestClassifier(**rf_kwargs)
+                rf.fit(X_tr, y_tr); p = apply_threshold(rf, X_te)
                 models["RF"] = rf; preds["RF"] = p
                 results["Random Forest"] = ev(y_te, p, len(class_names))
 
@@ -375,14 +467,14 @@ xgb.fit(X_tr, y_tr)
                 try:
                     from xgboost import XGBClassifier
                     obj = "binary:logistic" if len(class_names) == 2 else "multi:softprob"
-                    # ★ 이진분류 + 불균형이면 scale_pos_weight 자동 적용
                     xgb_kwargs = dict(n_estimators=n_est, learning_rate=0.1,
                                       max_depth=6, objective=obj, random_state=42,
                                       n_jobs=-1, eval_metric="logloss")
-                    if len(class_names) == 2 and spw > 2:
+                    # 리샘플링 안 했고 + 이진 + 불균형이면 scale_pos_weight 자동 적용
+                    if not already_balanced and len(class_names) == 2 and spw > 2:
                         xgb_kwargs["scale_pos_weight"] = spw
                     xgb = XGBClassifier(**xgb_kwargs)
-                    xgb.fit(X_tr, y_tr); p = xgb.predict(X_te)
+                    xgb.fit(X_tr, y_tr); p = apply_threshold(xgb, X_te)
                     models["XGBoost"] = xgb; preds["XGBoost"] = p
                     results["XGBoost"] = ev(y_te, p, len(class_names))
                 except ImportError:
@@ -395,16 +487,22 @@ xgb.fit(X_tr, y_tr)
                 X_tr_s = sc.fit_transform(X_tr); X_te_s = sc.transform(X_te)
                 mlp = MLPClassifier(hidden_layer_sizes=(64,32), max_iter=200,
                                     random_state=42, early_stopping=True)
-                mlp.fit(X_tr_s, y_tr); p = mlp.predict(X_te_s)
+                mlp.fit(X_tr_s, y_tr); p = apply_threshold(mlp, X_te_s)
                 models["MLP"] = mlp; preds["MLP"] = p
                 results["MLP"] = ev(y_te, p, len(class_names))
 
         st.success("🎉 완료!")
+        # 적용된 불균형 처리 요약
+        st.info(
+            f"⚙️ **불균형 처리 설정** — 리샘플링: `{resample_applied}` · "
+            f"결정 임계값: `{threshold:.2f}` · "
+            f"class_weight/scale_pos_weight: `{'OFF (리샘플링과 중복 방지)' if already_balanced else 'ON (자동)'}`"
+        )
 
         # ────────────────────────────────────────────────────────────
         # 5️⃣ 모델 비교 + 해석
         # ────────────────────────────────────────────────────────────
-        st.markdown("### 5️⃣ 모델 비교")
+        st.markdown("### 6️⃣ 모델 비교")
         cmp = pd.DataFrame(results).T.map(lambda x: f"{x*100:.1f}%")
         st.dataframe(cmp, use_container_width=True)
 
@@ -453,7 +551,7 @@ xgb.fit(X_tr, y_tr)
         # ────────────────────────────────────────────────────────────
         # 6️⃣ Feature Importance + 해석 (차트 축소)
         # ────────────────────────────────────────────────────────────
-        st.markdown("### 6️⃣ Feature Importance — 어떤 변수가 중요한가?")
+        st.markdown("### 7️⃣ Feature Importance — 어떤 변수가 중요한가?")
         fi_keys = [k for k in ["RF","XGBoost"] if k in models]
         if fi_keys:
             setup_korean_font()   # 폰트 보장
@@ -497,7 +595,7 @@ xgb.fit(X_tr, y_tr)
         # ────────────────────────────────────────────────────────────
         # 7️⃣ Confusion Matrix + 해석 (차트 축소)
         # ────────────────────────────────────────────────────────────
-        st.markdown("### 7️⃣ Confusion Matrix — 어디서 틀렸나?")
+        st.markdown("### 8️⃣ Confusion Matrix — 어디서 틀렸나?")
         setup_korean_font()
         cms = st.columns(len(preds))
         cm_summary = {}
