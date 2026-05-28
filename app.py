@@ -29,25 +29,33 @@ import matplotlib.pyplot as plt
 # ============================================================================
 # 한글 폰트  — 매 차트 직전에도 호출해서 깨짐 방지
 # ============================================================================
+import platform
+import matplotlib.font_manager as fm
+
 KOR_FONT = None
 def setup_korean_font():
-    """한글 폰트 자동 탐지. 한 번 찾으면 캐시."""
     global KOR_FONT
     if KOR_FONT is None:
-        import matplotlib.font_manager as fm
-        candidates = ["Malgun Gothic", "AppleGothic", "NanumGothic",
-                      "Noto Sans CJK KR", "DejaVu Sans"]
-        available = {f.name for f in fm.fontManager.ttflist}
-        for c in candidates:
-            if c in available:
-                KOR_FONT = c
-                break
-        if KOR_FONT is None:
-            KOR_FONT = "DejaVu Sans"
+        system = platform.system()
+        if system == "Windows":
+            KOR_FONT = "Malgun Gothic"
+        elif system == "Darwin":   # Mac
+            KOR_FONT = "AppleGothic"
+        else:                      # Linux (Streamlit Cloud)
+            # packages.txt 로 fonts-nanum 설치 후, 캐시가 stale 이면
+            # NanumGothic 이 안 보이는 경우가 있어 한 번 강제로 다시 로드
+            available = {f.name for f in fm.fontManager.ttflist}
+            if "NanumGothic" not in available:
+                try:
+                    fm._load_fontmanager(try_read_cache=False)
+                except Exception:
+                    pass
+            KOR_FONT = "NanumGothic"
     plt.rcParams["font.family"] = KOR_FONT
     plt.rcParams["axes.unicode_minus"] = False
 
 setup_korean_font()
+
 
 
 # ============================================================================
