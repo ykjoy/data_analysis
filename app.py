@@ -9,7 +9,7 @@ import streamlit as st
 from openai import OpenAI
 
 st.set_page_config(page_title="공공민원 자동화", page_icon="🏛️", layout="wide")
-st.title("🏛️ 공공 민원 답변 자동화 (Multi-Agent Demo)")
+st.title("🏛️ 공공--- 민원 답변 자동화 (Multi-Agent Demo)")
 
 # ===== Block 2. Gemini 클라이언트 생성 (OpenAI 호환 엔드포인트 사용) =====
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]   # Streamlit Secrets에서 키 불러오기
